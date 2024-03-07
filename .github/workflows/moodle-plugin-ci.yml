@@ -4,11 +4,17 @@ on: [push, pull_request]
 
 jobs:
   test:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/USI' || github.ref == 'refs/heads/dev_testing' || startsWith(github.ref, 'refs/heads/MOODLE')
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/USI' || github.ref == 'refs/heads/dev_testing' || github.ref == 'refs/heads/dev_testing-oracledb' || startsWith(github.ref, 'refs/heads/MOODLE')
 
     runs-on: ubuntu-22.04
 
     services:
+      oracle:
+        image: gvenzl/oracle-xe:21-slim
+        env:
+          ORACLE_USER: 'oracle'
+        ports:
+          - 1521:1521
       postgres:
         image: postgres:14
         env:
@@ -30,6 +36,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - php: 8.2
+            moodle-branch: MOODLE_403_STABLE
+            database: oracle
           - php: 8.2
             moodle-branch: MOODLE_403_STABLE
             database: pgsql
