@@ -204,9 +204,11 @@ class vatnrchecker extends checkout_base_item {
         }
         $vatcodecountry = explode(',', $changedinput->vatCodeCountry ?? ',');
         [$countrycode, $vatnumber] = $vatcodecountry;
+        $soapclient = isset($changedinput->soapclient) ? json_decode($changedinput->soapclient) : null;
         return [
             'country' => $countrycode,
             'vatnumber' => $vatnumber,
+            'client' => $soapclient,
         ];
     }
 

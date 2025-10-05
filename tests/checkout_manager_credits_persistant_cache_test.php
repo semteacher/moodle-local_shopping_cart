@@ -92,6 +92,8 @@ final class checkout_manager_credits_persistant_cache_test extends checkout_proc
         $addresids = $this->generate_fake_addresses($student1);
         $managercache = [];
 
+        $this->soapmock->method('checkVat')->willReturn(['valid' => true]);
+
         foreach ($changedinputsteps as $step => $stepdata) {
             if (isset($stepdata['generatedcredits'])) {
                 $balance = shopping_cart_credits::add_credit($student1->id, $stepdata['generatedcredits'], 'EUR', '');
@@ -106,6 +108,17 @@ final class checkout_manager_credits_persistant_cache_test extends checkout_proc
                     $stepdata['changedinput'] = str_replace(
                         'REPLACE_WITH_ADDRESSID',
                         $replacement,
+                        $stepdata['changedinput'],
+                        $replacecount
+                    );
+                }
+                while (str_contains($stepdata['changedinput'], 'REPLACE_WITH_SOAPMOCK')) {
+                    //$replacement = json_encode($this->soapmock);
+                    $replacement = &$this->soapmock;
+                    $replacecount = 1;
+                    $stepdata['changedinput'] = str_replace(
+                        'REPLACE_WITH_SOAPMOCK',
+                        json_encode($replacement),
                         $stepdata['changedinput'],
                         $replacecount
                     );
@@ -148,6 +161,130 @@ final class checkout_manager_credits_persistant_cache_test extends checkout_proc
      */
     public static function checkoutprocessdataprovider(): array {
         return [
+            'User has cerdits, does not use it, inputs addresses and valid vatnumber, no cache deletion' => [
+                [
+                    'showvatnrchecker' => '1',
+                    'owncountrycode' => 'DE',
+                    'onlywithvatnrnumber' => '1',
+                    'addresses_required' => 'billing,shipping',
+                    'taxcategories' => 'default A:20 B:20 C:10
+                        AT A:20 B:10 C:0
+                        DE A:19 B:10 C:0',
+                    'enabletax' => '1',
+                    'defaultcostcenterforcredits' => 'IT140030',
+                    'costcenterstrings' => 'IT140030',
+                ],
+                [
+                    [
+                        'generatedcredits' => '5',
+                        'usecredit' => false,
+                        'purgecache' => false,
+                    ],
+                    [
+                        'changedinput' =>
+                            '[{"name":"selectedaddress_billing","value":"REPLACE_WITH_ADDRESSID"}]',
+                        'controlparameter' => [
+                            "currentstep" => 0,
+                            "action" => null,
+                        ],
+                    ],
+                    [
+                        'changedinput' =>
+                            '[{"name":"selectedaddress_shipping","value":"REPLACE_WITH_ADDRESSID"}]',
+                        'controlparameter' => [
+                            "currentstep" => 0,
+                            "action" => null,
+                        ],
+                    ],
+                    [
+                        'changedinput' =>
+                            '[]',
+                        'controlparameter' => [
+                            "currentstep" => 0,
+                            "action" => 'next',
+                        ],
+                    ],
+                    [
+                        'changedinput' => '{"vatCodeCountry":"AT,ATU74259768","soapclient":"REPLACE_WITH_SOAPMOCK"}',
+                        'controlparameter' => [
+                            "currentstep" => 1,
+                            "action" => null,
+                        ],
+                    ],
+                ],
+                [
+                    'checkoutmanager' => [
+                        'assertvalidcheckout',
+                        'assertcartstorevatnumber',
+                        'assertcartstoretaxnull',
+                    ],
+                    'shoppingcart' => [
+                        'assertbalanceisnotnull',
+                        'payedpriceissame',
+                    ],
+                ],
+            ],
+            'User has cerdits, uses it, inputs addresses and valid vatnumber, no cache deletion' => [
+                [
+                    'showvatnrchecker' => '1',
+                    'owncountrycode' => 'DE',
+                    'onlywithvatnrnumber' => '1',
+                    'addresses_required' => 'billing,shipping',
+                    'taxcategories' => 'default A:20 B:20 C:10
+                        AT A:20 B:10 C:0
+                        DE A:19 B:10 C:0',
+                    'enabletax' => '1',
+                    'defaultcostcenterforcredits' => 'IT140030',
+                    'costcenterstrings' => 'IT140030',
+                ],
+                [
+                    [
+                        'generatedcredits' => '5',
+                        'usecredit' => true,
+                        'purgecache' => false,
+                    ],
+                    [
+                        'changedinput' =>
+                            '[{"name":"selectedaddress_billing","value":"REPLACE_WITH_ADDRESSID"}]',
+                        'controlparameter' => [
+                            "currentstep" => 0,
+                            "action" => null,
+                        ],
+                    ],
+                    [
+                        'changedinput' =>
+                            '[{"name":"selectedaddress_shipping","value":"REPLACE_WITH_ADDRESSID"}]',
+                        'controlparameter' => [
+                            "currentstep" => 0,
+                            "action" => null,
+                        ],
+                    ],
+                    [
+                        'changedinput' =>
+                            '[]',
+                        'controlparameter' => [
+                            "currentstep" => 0,
+                            "action" => 'next',
+                        ],
+                    ],
+                    [
+                        'changedinput' => '{"vatCodeCountry":"AT,ATU74259768"}',
+                        'controlparameter' => [
+                            "currentstep" => 1,
+                            "action" => null,
+                        ],
+                    ],
+                ],
+                [
+                    'checkoutmanager' => [
+                        'assertvalidcheckout',
+                        'assertcartstorevatnumber',
+                        'assertcartstoretaxnull',
+                    ],
+                    'shoppingcart' => [
+                    ],
+                ],
+            ],
             'User has no cerdits, does use it, inputs addresses and invalid vatnumber, no cache deletion' => [
                 [
                     'showvatnrchecker' => '1',
@@ -269,130 +406,6 @@ final class checkout_manager_credits_persistant_cache_test extends checkout_proc
                     ],
                     'shoppingcart' => [
                         'payedpriceissame',
-                    ],
-                ],
-            ],
-            'User has cerdits, does not use it, inputs addresses and valid vatnumber, no cache deletion' => [
-                [
-                    'showvatnrchecker' => '1',
-                    'owncountrycode' => 'DE',
-                    'onlywithvatnrnumber' => '1',
-                    'addresses_required' => 'billing,shipping',
-                    'taxcategories' => 'default A:20 B:20 C:10
-                        AT A:20 B:10 C:0
-                        DE A:19 B:10 C:0',
-                    'enabletax' => '1',
-                    'defaultcostcenterforcredits' => 'IT140030',
-                    'costcenterstrings' => 'IT140030',
-                ],
-                [
-                    [
-                        'generatedcredits' => '5',
-                        'usecredit' => false,
-                        'purgecache' => false,
-                    ],
-                    [
-                        'changedinput' =>
-                            '[{"name":"selectedaddress_billing","value":"REPLACE_WITH_ADDRESSID"}]',
-                        'controlparameter' => [
-                            "currentstep" => 0,
-                            "action" => null,
-                        ],
-                    ],
-                    [
-                        'changedinput' =>
-                            '[{"name":"selectedaddress_shipping","value":"REPLACE_WITH_ADDRESSID"}]',
-                        'controlparameter' => [
-                            "currentstep" => 0,
-                            "action" => null,
-                        ],
-                    ],
-                    [
-                        'changedinput' =>
-                            '[]',
-                        'controlparameter' => [
-                            "currentstep" => 0,
-                            "action" => 'next',
-                        ],
-                    ],
-                    [
-                        'changedinput' => '{"vatCodeCountry":"AT,ATU74259768"}',
-                        'controlparameter' => [
-                            "currentstep" => 1,
-                            "action" => null,
-                        ],
-                    ],
-                ],
-                [
-                    'checkoutmanager' => [
-                        'assertvalidcheckout',
-                        'assertcartstorevatnumber',
-                        'assertcartstoretaxnull',
-                    ],
-                    'shoppingcart' => [
-                        'assertbalanceisnotnull',
-                        'payedpriceissame',
-                    ],
-                ],
-            ],
-            'User has cerdits, uses it, inputs addresses and valid vatnumber, no cache deletion' => [
-                [
-                    'showvatnrchecker' => '1',
-                    'owncountrycode' => 'DE',
-                    'onlywithvatnrnumber' => '1',
-                    'addresses_required' => 'billing,shipping',
-                    'taxcategories' => 'default A:20 B:20 C:10
-                        AT A:20 B:10 C:0
-                        DE A:19 B:10 C:0',
-                    'enabletax' => '1',
-                    'defaultcostcenterforcredits' => 'IT140030',
-                    'costcenterstrings' => 'IT140030',
-                ],
-                [
-                    [
-                        'generatedcredits' => '5',
-                        'usecredit' => true,
-                        'purgecache' => false,
-                    ],
-                    [
-                        'changedinput' =>
-                            '[{"name":"selectedaddress_billing","value":"REPLACE_WITH_ADDRESSID"}]',
-                        'controlparameter' => [
-                            "currentstep" => 0,
-                            "action" => null,
-                        ],
-                    ],
-                    [
-                        'changedinput' =>
-                            '[{"name":"selectedaddress_shipping","value":"REPLACE_WITH_ADDRESSID"}]',
-                        'controlparameter' => [
-                            "currentstep" => 0,
-                            "action" => null,
-                        ],
-                    ],
-                    [
-                        'changedinput' =>
-                            '[]',
-                        'controlparameter' => [
-                            "currentstep" => 0,
-                            "action" => 'next',
-                        ],
-                    ],
-                    [
-                        'changedinput' => '{"vatCodeCountry":"AT,ATU74259768"}',
-                        'controlparameter' => [
-                            "currentstep" => 1,
-                            "action" => null,
-                        ],
-                    ],
-                ],
-                [
-                    'checkoutmanager' => [
-                        'assertvalidcheckout',
-                        'assertcartstorevatnumber',
-                        'assertcartstoretaxnull',
-                    ],
-                    'shoppingcart' => [
                     ],
                 ],
             ],

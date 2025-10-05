@@ -37,6 +37,7 @@ use OnlinePayments\Sdk\Domain\PaymentStatusOutput;
 use OnlinePayments\Sdk\Domain\RedirectPaymentMethodSpecificOutput;
 use paygw_payone\payone_sdk;
 use tool_mocktesttime\time_mock;
+use local_shopping_cart\tests\SoapClientMock;
 use stdClass;
 
 defined('MOODLE_INTERNAL') || die();
@@ -56,6 +57,13 @@ require_once($CFG->dirroot . '/payment/gateway/payone/thirdparty/vendor/autoload
 abstract class checkout_process_test_setup extends \advanced_testcase {
     /** @var \core_payment\account account */
     protected $account;
+
+    /**
+     * Soap Mock instance.
+     *
+     * @var object
+     */
+    protected object $soapmock;
 
     /**
      * Setup function.
@@ -86,6 +94,25 @@ abstract class checkout_process_test_setup extends \advanced_testcase {
         $record->config = json_encode($config);
 
         $accountgateway1 = \core_payment\helper::save_payment_gateway($record);
+
+        // Mock SoapClient.
+        $builder = $this->getMockBuilder(SoapClientMock::class);
+
+        // Prefer to disable the real constructor to avoid WSDL/network calls in tests.
+        if (method_exists($builder, 'disableOriginalConstructor')) {
+            $builder->disableOriginalConstructor();
+        }
+
+        // PHPUnit 9/10+: onlyMethods / addMethods.
+        if (method_exists($builder, 'onlyMethods')) {
+            $builder->onlyMethods(['checkVat']);
+        } else {
+            // Older PHPUnit.
+            $builder->setMethods(['checkVat']);
+        }
+
+        $this->soapmock = $builder->getMock();
+        $this->soapmock->method('checkVat')->willReturn(['valid' => true]);
 
         $responsedata = $this->createMock(CreateHostedCheckoutResponse::class);
         $responsedata->method('getHostedCheckoutId')
